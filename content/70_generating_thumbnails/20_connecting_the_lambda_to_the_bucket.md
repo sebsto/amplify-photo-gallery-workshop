@@ -9,7 +9,7 @@ Now that we've created our Photo Processor function, we need to set up a trigger
 
 1. **Replace photo-albums/amplify/backend/storage/photoalbumsstorage/s3-cloudformation-template.json** with the following:
 <div style="height: 550px; overflow-y: scroll;">
-{{< highlight json "hl_lines=78-87 121-144 147-163">}}
+{{< highlight json "hl_lines=150-159 213-236 239-274">}}
 {
 	"AWSTemplateFormatVersion": "2010-09-09",
 	"Description": "S3 resource stack creation using Amplify CLI",
@@ -29,61 +29,127 @@ Now that we've created our Photo Processor function, we need to set up a trigger
 		"unauthRoleName": {
 			"Type": "String"
 		},
-		"unauthPermissions": {
+		"s3PublicPolicy": {
 			"Type": "String"
 		},
-		"authPermissions": {
+		"s3PrivatePolicy": {
+			"Type": "String"
+		},
+		"s3ProtectedPolicy": {
+			"Type": "String"
+		},
+		"s3UploadsPolicy": {
+			"Type": "String"
+		},
+		"s3ReadPolicy": {
+			"Type": "String"
+		},
+		"s3PermissionsAuthenticatedPublic": {
+			"Type": "String"
+		},
+		"s3PermissionsAuthenticatedProtected": {
+			"Type": "String"
+		},
+		"s3PermissionsAuthenticatedPrivate": {
+			"Type": "String"
+		},
+		"s3PermissionsAuthenticatedUploads": {
+			"Type": "String"
+		},
+		"s3PermissionsGuestPublic": {
+			"Type": "String"
+		},	
+		"s3PermissionsGuestUploads": {
+			"Type": "String"
+		},
+		"AuthenticatedAllowList": {
+			"Type": "String"
+		},
+		"GuestAllowList": {
+			"Type": "String"
+		},
+		"selectedGuestPermissions": {
+			"Type": "CommaDelimitedList"
+		},
+		"selectedAuthenticatedPermissions": {
+			"Type": "CommaDelimitedList"
+		},
+		"env": {
 			"Type": "String"
 		}
 	},
 	"Conditions": {
-		"EnableUnauthReadWrite": {
+		"ShouldNotCreateEnvResources": {
 			"Fn::Equals": [
 				{
-					"Ref": "unauthPermissions"
+					"Ref": "env"
 				},
-				"rw"
+				"NONE"
 			]
 		},
-		"EnableUnauthRead": {
-			"Fn::Equals": [
-				{
-					"Ref": "unauthPermissions"
-				},
-				"r"
-			]
+		"CreateAuthPublic": {
+			"Fn::Not" : [{
+				"Fn::Equals" : [
+					 {"Ref" : "s3PermissionsAuthenticatedPublic"},
+					 "DISALLOW"
+				]
+		 }]
 		},
-		"EnableUnauthWrite": {
-			"Fn::Equals": [
-				{
-					"Ref": "unauthPermissions"
-				},
-				"w"
-			]
+		"CreateAuthProtected": {
+			"Fn::Not" : [{
+				"Fn::Equals" : [
+					 {"Ref" : "s3PermissionsAuthenticatedProtected"},
+					 "DISALLOW"
+				]
+		 }]
 		},
-		"EnableAuthReadWrite": {
-			"Fn::Equals": [
-				{
-					"Ref": "authPermissions"
-				},
-				"rw"
-			]
+		"CreateAuthPrivate": {
+			"Fn::Not" : [{
+				"Fn::Equals" : [
+					 {"Ref" : "s3PermissionsAuthenticatedPrivate"},
+					 "DISALLOW"
+				]
+		 }]
 		},
-		"EnableAuthRead": {
-			"Fn::Equals": [
-				{
-					"Ref": "authPermissions"
-				},
-				"r"
-			]
+		"CreateAuthUploads": {
+			"Fn::Not" : [{
+				"Fn::Equals" : [
+					 {"Ref" : "s3PermissionsAuthenticatedUploads"},
+					 "DISALLOW"
+				]
+		 }]
 		},
-		"EnableAuthWrite": {
-			"Fn::Equals": [
-				{
-					"Ref": "authPermissions"
-				},
-				"w"
-			]
+		"CreateGuestPublic": {
+			"Fn::Not" : [{
+				"Fn::Equals" : [
+					 {"Ref" : "s3PermissionsGuestPublic"},
+					 "DISALLOW"
+				]
+		 }]
+		},
+		"CreateGuestUploads": {
+			"Fn::Not" : [{
+				"Fn::Equals" : [
+					 {"Ref" : "s3PermissionsGuestUploads"},
+					 "DISALLOW"
+				]
+		 }]
+		},
+		"AuthReadAndList": {
+			"Fn::Not" : [{
+				"Fn::Equals" : [
+					 {"Ref" : "AuthenticatedAllowList"},
+					 "DISALLOW"
+				]
+		 }]
+		},
+		"GuestReadAndList": {
+			"Fn::Not" : [{
+				"Fn::Equals" : [
+					 {"Ref" : "GuestAllowList"},
+					 "DISALLOW"
+				]
+		 }]
 		}
 	},
 	"Resources": {
@@ -102,8 +168,27 @@ Now that we've created our Photo Processor function, we need to set up a trigger
 			"DeletionPolicy" : "Retain",
 			"Properties": {
 				"BucketName": {
-					"Ref": "bucketName"
-				},
+                    "Fn::If": [
+                        "ShouldNotCreateEnvResources",
+                        {
+                            "Ref": "bucketName"
+                        },
+                        {
+                            "Fn::Join": [
+                                "",
+                                [
+                                    {
+                                        "Ref": "bucketName"
+                                    },
+                                    "-",
+                                    {
+                                        "Ref": "env"
+                                    }
+                                ]
+                            ]
+                        }
+                    ]
+                },
 				"CorsConfiguration": {
 					"CorsRules": [
 						{
@@ -123,7 +208,8 @@ Now that we've created our Photo Processor function, we need to set up a trigger
 							"ExposedHeaders": [
 								"x-amz-server-side-encryption",
 								"x-amz-request-id",
-								"x-amz-id-2"
+								"x-amz-id-2",
+								"ETag"
 							],
 							"Id": "S3CORSRuleId1",
 							"MaxAge": "3000"
@@ -156,7 +242,7 @@ Now that we've created our Photo Processor function, we need to set up a trigger
 				}
 			}
 		},
-		"DenyListS3Buckets": {
+		"DenyListS3BucketsAuth": {
 			"DependsOn": [ "S3Bucket" ],
 			"Type": "AWS::IAM::Policy",
 			"Properties": {
@@ -174,274 +260,33 @@ Now that we've created our Photo Processor function, we need to set up a trigger
 				}
 			}
 		},
-		"S3UnauthPolicyRW": {
-			"Condition": "EnableUnauthReadWrite",
-			"DependsOn": [
-				"S3Bucket"
-			],
+		"DenyListS3BucketsGuest": {
+			"DependsOn": [ "S3Bucket" ],
 			"Type": "AWS::IAM::Policy",
 			"Properties": {
-				"PolicyName": {
-					"Ref": "authPolicyName"
-				},
-				"Roles": [
-					{
-						"Ref": "unauthRoleName"
-					}
-				],
+				"PolicyName": "DenyListS3BucketsGuest",
+				"Roles": [ { "Ref": "unauthRoleName" } ],
 				"PolicyDocument": {
 					"Version": "2012-10-17",
 					"Statement": [
 						{
-							"Effect": "Allow",
-							"Action": [
-								"s3:GetObject",
-								"s3:PutObject",
-								"s3:DeleteObject"
-							],
-							"Resource": [
-								{
-									"Fn::Join": [
-										"",
-										[
-											"arn:aws:s3:::",
-											{
-												"Ref": "S3Bucket"
-											},
-											"/public/*"
-										]
-									]
-								}
-							]
-						},
-						{
-							"Effect": "Allow",
-							"Action": [
-								"s3:PutObject"
-							],
-							"Resource": [
-								{
-									"Fn::Join": [
-										"",
-										[
-											"arn:aws:s3:::",
-											{
-												"Ref": "S3Bucket"
-											},
-											"/uploads/*"
-										]
-									]
-								}
-							]
-						},
-						{
-							"Effect": "Allow",
-							"Action": [
-								"s3:GetObject"
-							],
-							"Resource": [
-								{
-									"Fn::Join": [
-										"",
-										[
-											"arn:aws:s3:::",
-											{
-												"Ref": "S3Bucket"
-											},
-											"/protected/*"
-										]
-									]
-								}
-							]
-						},
-						{
-							"Effect": "Allow",
-							"Action": [
-								"s3:ListBucket"
-							],
-							"Resource": [
-								{
-									"Fn::Join": [
-										"",
-										[
-											"arn:aws:s3:::",
-											{
-												"Ref": "S3Bucket"
-											}
-										]
-									]
-								}
-							],
-							"Condition": {
-								"StringLike": {
-									"s3:prefix": [
-										"public/",
-										"public/*",
-										"protected/",
-										"protected/*"
-									]
-								}
-							}
+							"Effect": "Deny",
+							"Action": [ "s3:ListBucket" ],
+							"Resource": ["*"]
 						}
 					]
 				}
 			}
-		},
-		"S3UnauthPolicyR": {
-			"Condition": "EnableUnauthRead",
+		},		
+		"S3AuthPublicPolicy": {
 			"DependsOn": [
 				"S3Bucket"
 			],
+			"Condition": "CreateAuthPublic",
 			"Type": "AWS::IAM::Policy",
 			"Properties": {
 				"PolicyName": {
-					"Ref": "authPolicyName"
-				},
-				"Roles": [
-					{
-						"Ref": "unauthRoleName"
-					}
-				],
-				"PolicyDocument": {
-					"Version": "2012-10-17",
-					"Statement": [
-						{
-							"Effect": "Allow",
-							"Action": [
-								"s3:ListBucket"
-							],
-							"Resource": [
-								{
-									"Fn::Join": [
-										"",
-										[
-											"arn:aws:s3:::",
-											{
-												"Ref": "S3Bucket"
-											}
-										]
-									]
-								}
-							],
-							"Condition": {
-								"StringLike": {
-									"s3:prefix": [
-										"public/",
-										"public/*",
-										"protected/",
-										"protected/*"
-									]
-								}
-							}
-						},
-						{
-							"Effect": "Allow",
-							"Action": [
-								"s3:GetObject"
-							],
-							"Resource": [
-								{
-									"Fn::Join": [
-										"",
-										[
-											"arn:aws:s3:::",
-											{
-												"Ref": "S3Bucket"
-											},
-											"/protected/*"
-										]
-									]
-								},
-								{
-									"Fn::Join": [
-										"",
-										[
-											"arn:aws:s3:::",
-											{
-												"Ref": "S3Bucket"
-											},
-											"/public/*"
-										]
-									]
-								}
-							]
-						}
-					]
-				}
-			}
-		},
-		"S3UnauthPolicyW": {
-			"Condition": "EnableUnauthWrite",
-			"DependsOn": [
-				"S3Bucket"
-			],
-			"Type": "AWS::IAM::Policy",
-			"Properties": {
-				"PolicyName": {
-					"Ref": "authPolicyName"
-				},
-				"Roles": [
-					{
-						"Ref": "unauthRoleName"
-					}
-				],
-				"PolicyDocument": {
-					"Version": "2012-10-17",
-					"Statement": [
-						{
-							"Effect": "Allow",
-							"Action": [
-								"s3:PutObject",
-								"s3:DeleteObject"
-							],
-							"Resource": [
-								{
-									"Fn::Join": [
-										"",
-										[
-											"arn:aws:s3:::",
-											{
-												"Ref": "S3Bucket"
-											},
-											"/public/*"
-										]
-									]
-								}
-							]
-						},
-						{
-							"Effect": "Allow",
-							"Action": [
-								"s3:PutObject"
-							],
-							"Resource": [
-								{
-									"Fn::Join": [
-										"",
-										[
-											"arn:aws:s3:::",
-											{
-												"Ref": "S3Bucket"
-											},
-											"/uploads/*"
-										]
-									]
-								}
-							]
-						}
-					]
-				}
-			}
-		},
-		"S3AuthPolicyRW": {
-			"Condition": "EnableAuthReadWrite",
-			"DependsOn": [
-				"S3Bucket"
-			],
-			"Type": "AWS::IAM::Policy",
-			"Properties": {
-				"PolicyName": {
-					"Ref": "authPolicyName"
+					"Ref": "s3PublicPolicy"
 				},
 				"Roles": [
 					{
@@ -453,11 +298,11 @@ Now that we've created our Photo Processor function, we need to set up a trigger
 					"Statement": [
 						{
 							"Effect": "Allow",
-							"Action": [
-								"s3:GetObject",
-								"s3:PutObject",
-								"s3:DeleteObject"
-							],
+							"Action": {
+								"Fn::Split" : [ "," , {
+									"Ref": "s3PermissionsAuthenticatedPublic"
+								} ] 
+							},
 							"Resource": [
 								{
 									"Fn::Join": [
@@ -470,7 +315,39 @@ Now that we've created our Photo Processor function, we need to set up a trigger
 											"/public/*"
 										]
 									]
-								},
+								}
+							]
+						}
+					]
+				}
+			}
+		},
+		"S3AuthProtectedPolicy": {
+			"DependsOn": [
+				"S3Bucket"
+			],
+			"Condition": "CreateAuthProtected",
+			"Type": "AWS::IAM::Policy",
+			"Properties": {
+				"PolicyName": {
+					"Ref": "s3ProtectedPolicy"
+				},
+				"Roles": [
+					{
+						"Ref": "authRoleName"
+					}
+				],
+				"PolicyDocument": {
+					"Version": "2012-10-17",
+					"Statement": [
+						{
+							"Effect": "Allow",
+							"Action": {
+								"Fn::Split" : [ "," , {
+									"Ref": "s3PermissionsAuthenticatedProtected"
+								} ] 
+							},
+							"Resource": [
 								{
 									"Fn::Join": [
 										"",
@@ -482,7 +359,39 @@ Now that we've created our Photo Processor function, we need to set up a trigger
 											"/protected/${cognito-identity.amazonaws.com:sub}/*"
 										]
 									]
-								},
+								}
+							]
+						}
+					]
+				}
+			}
+		},
+		"S3AuthPrivatePolicy": {
+			"DependsOn": [
+				"S3Bucket"
+			],
+			"Condition": "CreateAuthPrivate",
+			"Type": "AWS::IAM::Policy",
+			"Properties": {
+				"PolicyName": {
+					"Ref": "s3PrivatePolicy"
+				},
+				"Roles": [
+					{
+						"Ref": "authRoleName"
+					}
+				],
+				"PolicyDocument": {
+					"Version": "2012-10-17",
+					"Statement": [
+						{
+							"Effect": "Allow",
+							"Action": {
+								"Fn::Split" : [ "," , {
+									"Ref": "s3PermissionsAuthenticatedPrivate"
+								} ] 
+							},
+							"Resource": [
 								{
 									"Fn::Join": [
 										"",
@@ -496,12 +405,36 @@ Now that we've created our Photo Processor function, we need to set up a trigger
 									]
 								}
 							]
-						},
+						}
+					]
+				}
+			}
+		},
+		"S3AuthUploadPolicy": {
+			"DependsOn": [
+				"S3Bucket"
+			],
+			"Condition": "CreateAuthUploads",
+			"Type": "AWS::IAM::Policy",
+			"Properties": {
+				"PolicyName": {
+					"Ref": "s3UploadsPolicy"
+				},
+				"Roles": [
+					{
+						"Ref": "authRoleName"
+					}
+				],
+				"PolicyDocument": {
+					"Version": "2012-10-17",
+					"Statement": [
 						{
 							"Effect": "Allow",
-							"Action": [
-								"s3:PutObject"
-							],
+							"Action": {
+								"Fn::Split" : [ "," , {
+									"Ref": "s3PermissionsAuthenticatedUploads"
+								} ] 
+							},
 							"Resource": [
 								{
 									"Fn::Join": [
@@ -516,7 +449,29 @@ Now that we've created our Photo Processor function, we need to set up a trigger
 									]
 								}
 							]
-						},
+						}
+					]
+				}
+			}
+		},
+		"S3AuthReadPolicy": {
+			"DependsOn": [
+				"S3Bucket"
+			],
+			"Condition": "AuthReadAndList",
+			"Type": "AWS::IAM::Policy",
+			"Properties": {
+				"PolicyName": {
+					"Ref": "s3ReadPolicy"
+				},
+				"Roles": [
+					{
+						"Ref": "authRoleName"
+					}
+				],
+				"PolicyDocument": {
+					"Version": "2012-10-17",
+					"Statement": [
 						{
 							"Effect": "Allow",
 							"Action": [
@@ -572,24 +527,132 @@ Now that we've created our Photo Processor function, we need to set up a trigger
 				}
 			}
 		},
-		"S3AuthPolicyR": {
-			"Condition": "EnableAuthRead",
+		"S3GuestPublicPolicy": {
 			"DependsOn": [
 				"S3Bucket"
 			],
+			"Condition": "CreateGuestPublic",
 			"Type": "AWS::IAM::Policy",
 			"Properties": {
 				"PolicyName": {
-					"Ref": "authPolicyName"
+					"Ref": "s3PublicPolicy"
 				},
 				"Roles": [
 					{
-						"Ref": "authRoleName"
+						"Ref": "unauthRoleName"
 					}
 				],
 				"PolicyDocument": {
 					"Version": "2012-10-17",
 					"Statement": [
+						{
+							"Effect": "Allow",
+							"Action": {
+								"Fn::Split" : [ "," , {
+									"Ref": "s3PermissionsGuestPublic"
+								} ] 
+							},
+							"Resource": [
+								{
+									"Fn::Join": [
+										"",
+										[
+											"arn:aws:s3:::",
+											{
+												"Ref": "S3Bucket"
+											},
+											"/public/*"
+										]
+									]
+								}
+							]
+						}
+					]
+				}
+			}
+		},
+		"S3GuestUploadPolicy": {
+			"DependsOn": [
+				"S3Bucket"
+			],
+			"Condition": "CreateGuestUploads",
+			"Type": "AWS::IAM::Policy",
+			"Properties": {
+				"PolicyName": {
+					"Ref": "s3UploadsPolicy"
+				},
+				"Roles": [
+					{
+						"Ref": "unauthRoleName"
+					}
+				],
+				"PolicyDocument": {
+					"Version": "2012-10-17",
+					"Statement": [
+						{
+							"Effect": "Allow",
+							"Action": {
+								"Fn::Split" : [ "," , {
+									"Ref": "s3PermissionsGuestUploads"
+								} ] 
+							},
+							"Resource": [
+								{
+									"Fn::Join": [
+										"",
+										[
+											"arn:aws:s3:::",
+											{
+												"Ref": "S3Bucket"
+											},
+											"/uploads/*"
+										]
+									]
+								}
+							]
+						}
+					]
+				}
+			}
+		},
+		"S3GuestReadPolicy": {
+			"DependsOn": [
+				"S3Bucket"
+			],
+			"Condition": "GuestReadAndList",
+			"Type": "AWS::IAM::Policy",
+			"Properties": {
+				"PolicyName": {
+					"Ref": "s3ReadPolicy"
+				},
+				"Roles": [
+					{
+						"Ref": "unauthRoleName"
+					}
+				],
+				"PolicyDocument": {
+					"Version": "2012-10-17",
+					"Statement": [
+						{
+							"Effect": "Allow",
+							"Action": [
+								"s3:GetObject"
+							],
+							"Resource": [
+								{
+									"Fn::Join": [
+										"",
+										[
+											"arn:aws:s3:::",
+											{
+												"Ref": "S3Bucket"
+											},
+											"/protected/*"
+										]
+									]
+								}
+							]
+						},
 						{
 							"Effect": "Allow",
 							"Action": [
@@ -615,177 +678,6 @@ Now that we've created our Photo Processor function, we need to set up a trigger
 										"public/*",
 										"protected/",
 										"protected/*"
-									]
-								}
-							}
-						},
-						{
-							"Effect": "Allow",
-							"Action": [
-								"s3:GetObject"
-							],
-							"Resource": [
-								{
-									"Fn::Join": [
-										"",
-										[
-											"arn:aws:s3:::",
-											{
-												"Ref": "S3Bucket"
-											},
-											"/protected/*"
-										]
-									]
-								},
-								{
-									"Fn::Join": [
-										"",
-										[
-											"arn:aws:s3:::",
-											{
-												"Ref": "S3Bucket"
-											},
-											"/public/*"
-										]
-									]
-								}
-							]
-						}
-					]
-				}
-			}
-		},
-		"S3AuthPolicyW": {
-			"Condition": "EnableAuthWrite",
-			"DependsOn": [
-				"S3Bucket"
-			],
-			"Type": "AWS::IAM::Policy",
-			"Properties": {
-				"PolicyName": {
-					"Ref": "authPolicyName"
-				},
-				"Roles": [
-					{
-						"Ref": "authRoleName"
-					}
-				],
-				"PolicyDocument": {
-					"Version": "2012-10-17",
-					"Statement": [
-						{
-							"Effect": "Allow",
-							"Action": [
-								"s3:GetObject",
-								"s3:PutObject",
-								"s3:DeleteObject"
-							],
-							"Resource": [
-								{
-									"Fn::Join": [
-										"",
-										[
-											"arn:aws:s3:::",
-											{
-												"Ref": "S3Bucket"
-											},
-											"/public/*"
-										]
-									]
-								},
-								{
-									"Fn::Join": [
-										"",
-										[
-											"arn:aws:s3:::",
-											{
-												"Ref": "S3Bucket"
-											},
-											"/protected/${cognito-identity.amazonaws.com:sub}/*"
-										]
-									]
-								},
-								{
-									"Fn::Join": [
-										"",
-										[
-											"arn:aws:s3:::",
-											{
-												"Ref": "S3Bucket"
-											},
-											"/private/${cognito-identity.amazonaws.com:sub}/*"
-										]
-									]
-								}
-							]
-						},
-						{
-							"Effect": "Allow",
-							"Action": [
-								"s3:PutObject"
-							],
-							"Resource": [
-								{
-									"Fn::Join": [
-										"",
-										[
-											"arn:aws:s3:::",
-											{
-												"Ref": "S3Bucket"
-											},
-											"/uploads/*"
-										]
-									]
-								}
-							]
-						},
-						{
-							"Effect": "Allow",
-							"Action": [
-								"s3:GetObject"
-							],
-							"Resource": [
-								{
-									"Fn::Join": [
-										"",
-										[
-											"arn:aws:s3:::",
-											{
-												"Ref": "S3Bucket"
-											},
-											"/protected/*"
-										]
-									]
-								}
-							]
-						},
-						{
-							"Effect": "Allow",
-							"Action": [
-								"s3:ListBucket"
-							],
-							"Resource": [
-								{
-									"Fn::Join": [
-										"",
-										[
-											"arn:aws:s3:::",
-											{
-												"Ref": "S3Bucket"
-											}
-										]
-									]
-								}
-							],
-							"Condition": {
-								"StringLike": {
-									"s3:prefix": [
-										"public/",
-										"public/*",
-										"protected/",
-										"protected/*",
-										"private/${cognito-identity.amazonaws.com:sub}/",
-										"private/${cognito-identity.amazonaws.com:sub}/*"
 									]
 								}
 							}
@@ -825,9 +717,10 @@ You can find this value in **photo-albums/src/aws-exports.js** under the **aws_u
 4. Wait for the update to complete. This step usually only takes a minute or two.
 
 ### What we changed in amplify/.../s3-cloudformation-template.json
+- Added a *InvokePhotoProcessorLambda* resource, giving the S3Bucket permission to invoke the PhotoProcessor lambda function.
+
 - Added a *NotificationConfiguration* property to the S3Bucket resource, configuring the bucket to invoke our PhotoProcessor lambda function when new photos are added to the 'uploads/' prefix
 
-- Added a *InvokePhotoProcessorLambda* resource, giving the S3Bucket permission to invoke the PhotoProcessor lambda function.
 
 - Added a *DenyListS3Buckets* IAM policy, preventing authenticated users from listing the contents of any buckets on S3
 

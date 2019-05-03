@@ -13,7 +13,7 @@ When following the instructions below, **you must name your lambda function _wor
 Later, we'll edit some CloudFormation templates, and the function name **workshopphotoprocessor** is hard coded to make it easier for this workshop (less edits that you'll have to do).
 {{% /notice %}}
 
-1. **From the photo-albums directory, run:** `amplify function add` and respond to the prompts the same way as shown below:
+1. **From the photo-albums directory, run:** `amplify function add` and respond to the prompts the same way as shown below. Make sure you press Enter before continuing to step 2:
 	```text
 	$ amplify function add
 	Using service: Lambda, provided by: awscloudformation
@@ -60,9 +60,7 @@ const uuidv4 = require('uuid/v4');
 Note: Sharp requires native extensions to be installed in a way that is compatible
 with Amazon Linux (in order to run successfully in a Lambda execution environment).
 
-If you're not working in Cloud9, you can use a docker image
-built to mimic AWS Lamda's execution environment to install the module's native dependencies: 
-docker run -v "$PWD":/var/task lambci/lambda:build-nodejs8.10 npm install
+If you're not working in Cloud9, you can follow the instructions on http://sharp.pixelplumbing.com/en/stable/install/#aws-lambda how to install the module and native dependencies.
 */
 const Sharp = require('sharp');
 
@@ -212,11 +210,14 @@ exports.handler = async (event, context, callback) => {
 
 8.  **Replace photo-albums/amplify/backend/function/workshopphotoprocessor/workshopphotoprocessor-cloudformation-template.json** with the following:
 <div style="height: 550px; overflow-y: scroll;">
-{{< highlight json "hl_lines=4-11 26-31 100-183">}}
+{{< highlight json "hl_lines=4-14 29-36 100-183">}}
 {
 	"AWSTemplateFormatVersion": "2010-09-09",
 	"Description": "Lambda resource stack creation using Amplify CLI",
 	"Parameters": {
+		"env": {
+            "Type": "String"
+        },
 		"S3UserfilesBucketName": {
 			"Type": "String"
 		},
@@ -240,6 +241,7 @@ exports.handler = async (event, context, callback) => {
 				"Timeout": "25",
 				"Environment": {
 					"Variables": {
+						"ENV": {"Ref": "env"},
 						"THUMBNAIL_WIDTH": "80",
 						"THUMBNAIL_HEIGHT": "80",
 						"DYNAMODB_PHOTOS_TABLE_ARN": { "Ref": "DynamoDBPhotosTableArn" }
@@ -427,9 +429,9 @@ exports.handler = async (event, context, callback) => {
 ### What we changed
 - Created a *parameters.json* file to pass some values into the Photo Processor function's CloudFormation template
 
-- Added parameters *S3UserfilesBucketName* and *DynamoDBPhotosTableArn* to the Photo Processor function's CloudFormation template
+- Added parameters *env*, *S3UserfilesBucketName*, and *DynamoDBPhotosTableArn* to the Photo Processor function's CloudFormation template
 
-- Added environment variables to the Photo Processor function's configuration: *THUMBNAIL_WIDTH*, *THUMBNAIL_HEIGHT*, *DYNAMODB_PHOTOS_TABLE_ARN*
+- Added environment variables to the Photo Processor function's configuration: *ENV*, *THUMBNAIL_WIDTH*, *THUMBNAIL_HEIGHT*, *DYNAMODB_PHOTOS_TABLE_ARN*
 
 - Added an *AllPrivsForPhotoAlbums* IAM policy to grant the function's role read and write access to the S3 bucket containing our photos
 
