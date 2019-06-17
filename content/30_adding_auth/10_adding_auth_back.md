@@ -43,7 +43,16 @@ This will create a new local configuration for us which we can use to set up an 
 
 1. **Run** `amplify add auth` to add authentication to the app
 
-1. **Select Yes** when asked if you'd like to use the default authentication and security configuration
+1. **Select all defaults** when asked what type of configuration do you want and the attributes used to authenticate your users.
+
+```text
+Do you want to use the default authentication and security configuration? Default configuration
+
+How do you want users to be able to sign in when using your Cognito User Pool? Username
+
+What attributes are required for signing up? (Press <space> to select, <a> to toggle all, <i> to invert selection)Email
+```
+
 
 1. **Run** `amplify push` to create these changes in the cloud
 

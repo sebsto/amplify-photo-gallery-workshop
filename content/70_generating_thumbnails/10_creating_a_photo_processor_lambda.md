@@ -20,19 +20,16 @@ Later, we'll edit some CloudFormation templates, and the function name **worksho
 
 
 	? Provide a friendly name for your resource to be used as a label for this category in the project: 
-
 	workshopphotoprocessor
-
 
 	? Provide the AWS Lambda function name: 
-
 	workshopphotoprocessor
 
-
 	? Choose the function template that you want to use: 
+    Hello world function
 
-	Hello world function
-
+    ? Do you want to access other resources created in this project from your Lambda function? 
+	No
 
 	? Do you want to edit the local lambda function now? 
 	Yes
